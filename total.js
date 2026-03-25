@@ -80,6 +80,64 @@ function sendNoResultsEmail(message) {
 
  
 /**
+ * 검색 쿼리 테스트 함수 (PubMed 검색만 실행, GPT/이메일 없음)
+ * Apps Script 에디터에서 testSearchQuery() 실행하면 검색 결과 확인 가능
+ */
+function testSearchQuery() {
+  console.log("===== 검색 쿼리 테스트 시작 =====");
+  console.log("검색 기간: 최근 " + CONFIG.DAYS_RANGE + "일");
+  console.log("저널 수: " + CONFIG.JOURNALS.length + "개");
+  console.log("최대 검색 수: " + CONFIG.MAX_RESULTS);
+  console.log("");
+
+  const spreadsheet = fetchPubMedWeeklyAndSave();
+
+  if (!spreadsheet) {
+    console.log("⚠️ 검색 결과 없음 (0건)");
+    return;
+  }
+
+  const sheet = spreadsheet.getSheetByName("journal_crawl_db");
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows = data.slice(1);
+
+  console.log("✅ 총 검색 결과: " + rows.length + "건");
+  console.log("📊 스프레드시트: " + spreadsheet.getUrl());
+  console.log("");
+
+  // 저널별 논문 수 집계
+  const titleIdx = headers.indexOf("Title");
+  const journalIdx = headers.indexOf("Journal");
+  const pmidIdx = headers.indexOf("PMID");
+
+  const journalCounts = {};
+  rows.forEach(function(row) {
+    const journal = row[journalIdx] || "Unknown";
+    journalCounts[journal] = (journalCounts[journal] || 0) + 1;
+  });
+
+  console.log("===== 저널별 논문 수 =====");
+  Object.keys(journalCounts)
+    .sort(function(a, b) { return journalCounts[b] - journalCounts[a]; })
+    .forEach(function(j) {
+      console.log("  " + journalCounts[j] + "건 - " + j);
+    });
+
+  console.log("");
+  console.log("===== 논문 목록 (상위 30건) =====");
+  var limit = Math.min(rows.length, 30);
+  for (var i = 0; i < limit; i++) {
+    var row = rows[i];
+    console.log((i + 1) + ". [PMID:" + row[pmidIdx] + "] " + row[titleIdx]);
+    console.log("   Journal: " + row[journalIdx]);
+    console.log("");
+  }
+
+  console.log("===== 테스트 완료 =====");
+}
+
+/**
  * 활성화된 스프레드시트의 요약 결과만 이메일로 전송하는 함수
  * (독립적으로 이메일 전송만 실행하고 싶은 경우 사용)
  */
