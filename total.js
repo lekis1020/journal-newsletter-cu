@@ -49,7 +49,7 @@ function sendNoResultsEmail(message) {
   const searchPeriod = `${formatKoreanDate(startDate)}부터 ${formatKoreanDate(today)}까지`;
   Logger.log(searchPeriod); 
 
-  const emailSubject = `[알레르기연구팀 Journal Letter] ${searchPeriod} Urticaria/Angioedema/Anaphylaxis/Mastocytosis/FoodAllergy ${searchPeriod} `;
+  const emailSubject = `[CU-Ana Newsletter] ${searchPeriod} 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 관련 논문 없음`;
 
   // 이메일 본문 시작
   let emailBody = `<div style="font-family: Arial, sans-serif;">`;

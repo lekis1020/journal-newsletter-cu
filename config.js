@@ -44,7 +44,7 @@ const BUSINESS_CONFIG = {
   // 이메일 설정
   EMAIL_BATCH_SIZE: 15,             // 한 이메일에 포함할 논문 수
   EMAIL_MAX_LENGTH: 100000,         // 이메일 최대 길이 제한
-  EMAIL_SUBJECT_PREFIX: '[AllergyWG Journal Letter]',
+  EMAIL_SUBJECT_PREFIX: '[CU-Ana Newsletter]',
 
   // API 설정
   GPT_MODEL: 'gpt-5-mini',          // GPT 모델명 (gpt-5-mini, gpt-4o-mini, gpt-4-turbo 등)

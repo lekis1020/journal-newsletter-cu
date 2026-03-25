@@ -94,7 +94,7 @@ function sendSummariesToEmail(spreadsheet) {
     Logger.log(searchPeriod);
 
     // ✅ 이메일 제목: 필터링된 논문 수 사용
-    const subject = `[알레르기연구팀] ${searchPeriod} 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 관련 논문 - 총 ${filteredData.length}개 논문`;
+    const subject = `[CU-Ana Newsletter] ${searchPeriod} 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 관련 논문 - 총 ${filteredData.length}개 논문`;
 
     // 이메일 본문 시작
     let emailBody = `<div style="font-family: Arial, sans-serif;">`;

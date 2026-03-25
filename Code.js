@@ -1,12 +1,8 @@
 /**
- * 최근 N일(EDAT) AND 지정 저널 AND (호산구 또는 면역결핍/면역조절 키워드 포함) AND (암/항암/종양면역 키워드 포함 시 제외 + (선택) MeSH Major 암 주제 제외)
+ * CU-Ana Newsletter
+ * 최근 N일(EDAT) AND 지정 저널 AND (두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 키워드 포함)
  *
- * 호산구면역질환 WG newsletter
- * immune related disease
- * PID
- * - Eosinophilia
- * 제목에 호산구가 들어가는 모든 논문 검색
- * 특정 저널에서 원하는 mesh Terms 을 가지고 있는 논문 검색
+ * 특정 저널에서 원하는 키워드를 가지고 있는 논문 검색
  * 근거 수준 높은 논문들로만 선별
  * PubMed 논문 검색 및 GPT 요약 시스템
  * 1. PubMed에서 최근 논문 검색
