@@ -1,0 +1,11 @@
+# Local/dev artifacts
+.git/**
+.omx/**
+imports/**
+
+# Local docs / reports
+CLAUDE.md
+results-*.md
+
+# Never push clasp metadata
+.clasp.json

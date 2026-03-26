@@ -45,9 +45,14 @@ function scoreAndFilterPapers(spreadsheet) {
   const sheet = spreadsheet.getSheetByName("journal_crawl_db");
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
+  const scoringMode = String(CONFIG.SCORING_MODE || "regex").toLowerCase();
+  const useRegexAsPrimary = scoringMode !== "gpt";
+  const compareWithGpt = CONFIG.COMPARE_WITH_GPT_SCORING !== false;
   
   // 헤더 추가
-  const newHeaders = ["Scores", "Final Score", "Included", "Exclusion Reason"];
+  const newHeaders = compareWithGpt
+    ? ["Scores", "Final Score", "Included", "Exclusion Reason", "GPT Final Score", "GPT Included", "Score Diff (Regex-GPT)"]
+    : ["Scores", "Final Score", "Included", "Exclusion Reason"];
   const startCol = headers.length + 1;
   sheet.getRange(1, startCol, 1, newHeaders.length).setValues([newHeaders]);
   
@@ -55,6 +60,7 @@ function scoreAndFilterPapers(spreadsheet) {
   const titleIdx = headers.indexOf("Title");
   const abstractIdx = headers.indexOf("Abstract");
   const journalIdx = headers.indexOf("Journal");
+  const pubTypeIdx = headers.indexOf("Publication Type");
   
   if (titleIdx === -1 || abstractIdx === -1) {
     console.error("필수 컬럼 누락");
@@ -69,6 +75,7 @@ function scoreAndFilterPapers(spreadsheet) {
     const title = row[titleIdx];
     const abstract = String(row[abstractIdx] || "").trim();
     const journal = row[journalIdx];
+    const publicationType = pubTypeIdx !== -1 ? row[pubTypeIdx] : "";
 
     // 1. [NEW] 초록 없음 -> 즉시 제외
     if (!abstract) {
@@ -82,23 +89,44 @@ function scoreAndFilterPapers(spreadsheet) {
     }
 
     try {
-      // 2. GPT 평가
-      const relevance = evaluatePaperRelevance(title, abstract);
-      
-      // 3. 점수 계산
-      const calc = calculateScore(relevance, journal);
+      // 2. 정규식 기반 고정 룰 평가
+      const regexRelevance = evaluatePaperRelevanceRegex(title, abstract);
+      const regexCalc = calculateScore(regexRelevance, journal, title, publicationType);
+
+      // 3. GPT 기반 평가 (비교용 또는 gpt 모드)
+      let gptRelevance = null;
+      let gptCalc = null;
+      const needGpt = (compareWithGpt || !useRegexAsPrimary) && !!CONFIG.OPENAI_API_KEY_SCORING;
+      if (needGpt) {
+        gptRelevance = evaluatePaperRelevanceWithGPT(title, abstract);
+        gptCalc = calculateScore(gptRelevance, journal, title, publicationType);
+
+        // Rate Limit 방지
+        Utilities.sleep(500);
+      }
+
+      const primaryCalc = (useRegexAsPrimary || !gptCalc) ? regexCalc : gptCalc;
+      const actualScoringMode = (!useRegexAsPrimary && gptCalc) ? "gpt" : "regex";
+      if (!useRegexAsPrimary && !gptCalc) {
+        console.warn(`Row ${i + 2}: GPT scoring unavailable, fallback to regex scoring`);
+      }
       
       // 결과 저장
       results.push({
-        details: JSON.stringify(relevance),
-        score: calc.finalScore,
-        included: calc.isIncluded, // 점수 기준(3점) 통과 여부
-        reason: calc.reason,
+        details: JSON.stringify({
+          scoringMode: actualScoringMode,
+          regexFlags: regexRelevance,
+          gptFlags: gptRelevance,
+          localSignals: primaryCalc.localSignals
+        }),
+        score: primaryCalc.finalScore,
+        included: primaryCalc.isIncluded, // 점수 기준(3점) 통과 여부
+        reason: primaryCalc.reason,
+        gptScore: gptCalc ? gptCalc.finalScore : "",
+        gptIncluded: gptCalc ? (gptCalc.isIncluded ? "O" : "X") : "",
+        scoreDiff: gptCalc ? (regexCalc.finalScore - gptCalc.finalScore) : "",
         originalIndex: i
       });
-      
-      // Rate Limit 방지
-      Utilities.sleep(500); 
 
     } catch (e) {
       console.error(`Row ${i+2} scoring error:`, e);
@@ -106,7 +134,10 @@ function scoreAndFilterPapers(spreadsheet) {
           details: "Error",
           score: 0,
           included: false,
-          reason: e.message
+          reason: e.message,
+          gptScore: "",
+          gptIncluded: "",
+          scoreDiff: ""
       });
     }
   }
@@ -137,19 +168,74 @@ function scoreAndFilterPapers(spreadsheet) {
           finalReason += " (Excluded by Top 15 Limit)";
       }
 
-      return [
+      const row = [
           r.details,
           r.score,
           isFinalIncluded ? "O" : "X", // 최종 O/X
           finalReason
       ];
+
+      if (compareWithGpt) {
+        row.push(r.gptScore, r.gptIncluded, r.scoreDiff);
+      }
+
+      return row;
   });
 
   // 배치 업데이트
   sheet.getRange(2, startCol, updates.length, newHeaders.length).setValues(updates);
 }
 
-function evaluatePaperRelevance(title, abstract) {
+function emptyRelevanceFlags() {
+  return {
+    hasCancerInTitle: false, hasCancerInAbstract: false,
+    hasUrticariaInTitle: false, hasUrticariaInAbstract: false,
+    hasAnaphylaxisInTitle: false, hasAnaphylaxisInAbstract: false,
+    hasMastocytosisInTitle: false, hasMastocytosisInAbstract: false
+  };
+}
+
+function evaluatePaperRelevanceRegex(title, abstract) {
+  const titleText = String(title || "").toLowerCase();
+  const abstractText = String(abstract || "").toLowerCase();
+
+  const patterns = {
+    cancer: [
+      /\bcancers?\b/i, /\bcarcinoma\w*\b/i, /\btumou?r\w*\b/i, /\bmalignan\w*\b/i,
+      /\bneoplas\w*\b/i, /\bmetasta\w*\b/i, /\boncolog\w*\b/i, /\blymphoma\w*\b/i,
+      /\bleukemia\w*\b/i, /\bsarcoma\w*\b/i, /\bmelanoma\w*\b/i
+    ],
+    urticaria: [
+      /\burticaria\b/i, /\bchronic\s+(spontaneous\s+)?urticaria\b/i, /\bcsu\b/i,
+      /\bcindu\b/i, /\bangioedema\b/i, /\bhereditary\s+angioedema\b/i,
+      /\bhae\b/i, /\bbradykinin\b/i
+    ],
+    anaphylaxis: [
+      /\banaphylaxis\b/i, /\banaphylactic\b/i, /\bfood\s+allerg(y|ies)\b/i,
+      /\bfood\s+hypersensitivit(y|ies)\b/i, /\boral\s+immunotherapy\b/i,
+      /\boit\b/i, /\bfpies\b/i
+    ],
+    mastocytosis: [
+      /\bmastocytosis\b/i, /\bmast\s+cell(s)?\b/i, /\bsystemic\s+mastocytosis\b/i,
+      /\bcutaneous\s+mastocytosis\b/i, /\bmcas\b/i, /\bmast\s+cell\s+activation\b/i
+    ]
+  };
+
+  const hasMatch = (text, regs) => regs.some((r) => r.test(text));
+
+  return {
+    hasCancerInTitle: hasMatch(titleText, patterns.cancer),
+    hasCancerInAbstract: hasMatch(abstractText, patterns.cancer),
+    hasUrticariaInTitle: hasMatch(titleText, patterns.urticaria),
+    hasUrticariaInAbstract: hasMatch(abstractText, patterns.urticaria),
+    hasAnaphylaxisInTitle: hasMatch(titleText, patterns.anaphylaxis),
+    hasAnaphylaxisInAbstract: hasMatch(abstractText, patterns.anaphylaxis),
+    hasMastocytosisInTitle: hasMatch(titleText, patterns.mastocytosis),
+    hasMastocytosisInAbstract: hasMatch(abstractText, patterns.mastocytosis)
+  };
+}
+
+function evaluatePaperRelevanceWithGPT(title, abstract) {
   // ✅ OPTIMIZED: 프롬프트 압축 (토큰 30% 절약)
   const prompt = `Detect keywords in title/abstract:
 
@@ -178,12 +264,7 @@ Return JSON:
   
   if (!jsonStr) {
       console.error("GPT returned null/empty response");
-      return {
-        hasCancerInTitle: false, hasCancerInAbstract: false,
-        hasUrticariaInTitle: false, hasUrticariaInAbstract: false,
-        hasAnaphylaxisInTitle: false, hasAnaphylaxisInAbstract: false,
-        hasMastocytosisInTitle: false, hasMastocytosisInAbstract: false
-      };
+      return emptyRelevanceFlags();
   }
 
   try {
@@ -194,31 +275,98 @@ Return JSON:
     const cleanStr = jsonStr.replace(/```json/g, "").replace(/```/g, "").trim();
     const parsed = JSON.parse(cleanStr);
     console.log("DEBUG Parsed Flags:", JSON.stringify(parsed));
-    return parsed;
+    return {
+      hasCancerInTitle: !!parsed.hasCancerInTitle,
+      hasCancerInAbstract: !!parsed.hasCancerInAbstract,
+      hasUrticariaInTitle: !!parsed.hasUrticariaInTitle,
+      hasUrticariaInAbstract: !!parsed.hasUrticariaInAbstract,
+      hasAnaphylaxisInTitle: !!parsed.hasAnaphylaxisInTitle,
+      hasAnaphylaxisInAbstract: !!parsed.hasAnaphylaxisInAbstract,
+      hasMastocytosisInTitle: !!parsed.hasMastocytosisInTitle,
+      hasMastocytosisInAbstract: !!parsed.hasMastocytosisInAbstract
+    };
   } catch (e) {
     console.error("JSON parse error", e, "Raw:", jsonStr);
-    return {
-      hasCancerInTitle: false, hasCancerInAbstract: false,
-      hasUrticariaInTitle: false, hasUrticariaInAbstract: false,
-      hasAnaphylaxisInTitle: false, hasAnaphylaxisInAbstract: false,
-      hasMastocytosisInTitle: false, hasMastocytosisInAbstract: false
-    };
+    return emptyRelevanceFlags();
   }
 }
 
-function calculateScore(flags, journalName) {
-  let cancerScore = 0;
+function scoreJournalRelevance(journalName) {
+  const j = String(journalName || "").toLowerCase();
+  if (!j) return 0;
+
+  const topTierPatterns = [
+    "journal of allergy and clinical immunology",
+    "allergy",
+    "annals of allergy",
+    "clinical and experimental allergy",
+    "world allergy organization journal",
+    "allergy asthma immunol res",
+    "allergy, asthma and immunology research",
+    "allergy, asthma and respiratory disease",
+    "aair",
+    "aard"
+  ];
+
+  for (const p of topTierPatterns) {
+    if (j.includes(p)) return 1;
+  }
+  return 0;
+}
+
+function scorePublicationQuality(title, publicationType) {
+  const t = String(title || "").toLowerCase();
+  const p = String(publicationType || "").toLowerCase();
+  const text = `${t} ${p}`;
+
+  // 제외 우선 신호
+  if (/(^|\b)(correction|erratum|retraction|corrigendum)(\b|$)/.test(text)) {
+    return {
+      score: -5,
+      signal: "Correction/Erratum"
+    };
+  }
+
+  // 근거 수준 가산점
+  if (/(meta-analysis|systematic review|randomized controlled trial)/.test(text)) {
+    return {
+      score: 2,
+      signal: "High-evidence study type"
+    };
+  }
+
+  if (/(clinical trial|cohort|case-control|observational study|comparative study|multicenter study|evaluation study)/.test(text)) {
+    return {
+      score: 1,
+      signal: "Clinical study type"
+    };
+  }
+
+  // 상대적 저우선 문서
+  if (/(editorial|letter|comment|news)/.test(text)) {
+    return {
+      score: -2,
+      signal: "Low-priority publication type"
+    };
+  }
+
+  if (/(case report)/.test(text)) {
+    return {
+      score: -1,
+      signal: "Case report"
+    };
+  }
+
+  return {
+    score: 0,
+    signal: "Neutral publication type"
+  };
+}
+
+function calculateScore(flags, journalName, title, publicationType) {
   let urticariaScore = 0;
   let anaphylaxisScore = 0;
   let mastocytosisScore = 0;
-
-  // Cancer Scoring (감점)
-  if (flags.hasCancerInTitle && flags.hasCancerInAbstract) {
-    cancerScore = -3;
-  } else {
-    if (flags.hasCancerInTitle) cancerScore -= 1;
-    if (flags.hasCancerInAbstract) cancerScore -= 1;
-  }
 
   // Urticaria/Angioedema Scoring
   if (flags.hasUrticariaInTitle && flags.hasUrticariaInAbstract) {
@@ -246,14 +394,22 @@ function calculateScore(flags, journalName) {
 
   // Final Calculation: 각 주제별 점수 중 최고점 + cancer 감점
   const baseScore = Math.max(urticariaScore, anaphylaxisScore, mastocytosisScore);
-  const finalScore = baseScore + cancerScore;
+  const journalScore = scoreJournalRelevance(journalName);
+  const publication = scorePublicationQuality(title, publicationType);
+
+  const finalScore = baseScore + journalScore + publication.score;
 
   const isIncluded = finalScore >= CONFIG.MIN_RELEVANCE_SCORE;
 
   return {
     finalScore,
     isIncluded,
-    reason: `Base(${baseScore}) + Cancer(${cancerScore}) = ${finalScore}`
+    reason: `Base(${baseScore}) + Journal(${journalScore}) + Publication(${publication.score}:${publication.signal}) = ${finalScore}`,
+    localSignals: {
+      journalScore,
+      publicationScore: publication.score,
+      publicationSignal: publication.signal
+    }
   };
 }
 
