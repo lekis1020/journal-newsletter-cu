@@ -20,9 +20,9 @@ function sendSummariesToEmail(spreadsheet) {
     }
     
     // 시트 가져오기
-    const sheet = spreadsheet.getSheetByName('journal_crawl_db');
+    const sheet = spreadsheet.getSheetByName('journal_cu_ana_db');
     if (!sheet) {
-      console.error("'journal_crawl_db' 시트를 찾을 수 없습니다.");
+      console.error("'journal_cu_ana_db' 시트를 찾을 수 없습니다.");
       return "시트 없음";
     }
     

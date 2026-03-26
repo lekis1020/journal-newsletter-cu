@@ -97,7 +97,7 @@ function testSearchQuery() {
     return;
   }
 
-  const sheet = spreadsheet.getSheetByName("journal_crawl_db");
+  const sheet = spreadsheet.getSheetByName("journal_cu_ana_db");
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const rows = data.slice(1);

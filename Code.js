@@ -42,7 +42,7 @@ function fetchAndSummarizeAll() {
 }
 
 function scoreAndFilterPapers(spreadsheet) {
-  const sheet = spreadsheet.getSheetByName("journal_crawl_db");
+  const sheet = spreadsheet.getSheetByName("journal_cu_ana_db");
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const scoringMode = String(CONFIG.SCORING_MODE || "regex").toLowerCase();
@@ -417,7 +417,7 @@ function syncSheetToNotionPapersDB(spreadsheet, opts) {
   opts = opts || {};
   const includeSummary = !!opts.includeSummary;
 
-  const sheet = spreadsheet.getSheetByName("journal_crawl_db");
+  const sheet = spreadsheet.getSheetByName("journal_cu_ana_db");
   const values = sheet.getDataRange().getValues();
   const headers = values.shift();
 
@@ -1066,11 +1066,11 @@ function saveResultsToSheet(data) {
   try {
     const today = new Date();
     const formattedDate = Utilities.formatDate(today, "GMT+9", "yyyyMMdd");
-    const fileName = `journal_crawl_db_${formattedDate}`;
+    const fileName = `journal_cu_ana_db_${formattedDate}`;
 
     const spreadsheet = SpreadsheetApp.create(fileName);
     const sheet = spreadsheet.getActiveSheet();
-    sheet.setName("journal_crawl_db");
+    sheet.setName("journal_cu_ana_db");
 
     // ✅ 8열 헤더 (articleCategory 포함)
     const headers = ["Title", "Journal", "Date", "Authors", "PMID", "Publication Type", "Abstract", "ArticleCategory"];
@@ -1309,9 +1309,9 @@ function summarizePubMedArticlesWithGPT(spreadsheet) {
   let sheet;
   try {
     // 매개변수로 받은 스프레드시트 사용
-    sheet = spreadsheet.getSheetByName('journal_crawl_db');
+    sheet = spreadsheet.getSheetByName('journal_cu_ana_db');
     if (!sheet) {
-      console.error("'journal_crawl_db' 시트를 찾을 수 없습니다.");
+      console.error("'journal_cu_ana_db' 시트를 찾을 수 없습니다.");
       return "시트 없음";
     }
   } catch (error) {
