@@ -1,12 +1,8 @@
 /**
- * 최근 N일(EDAT) AND 지정 저널 AND (호산구 또는 면역결핍/면역조절 키워드 포함) AND (암/항암/종양면역 키워드 포함 시 제외 + (선택) MeSH Major 암 주제 제외)
+ * CU-Ana Newsletter
+ * 최근 N일(EDAT) AND 지정 저널 AND (두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 키워드 포함)
  *
- * 호산구면역질환 WG newsletter
- * immune related disease
- * PID
- * - Eosinophilia
- * 제목에 호산구가 들어가는 모든 논문 검색
- * 특정 저널에서 원하는 mesh Terms 을 가지고 있는 논문 검색
+ * 특정 저널에서 원하는 키워드를 가지고 있는 논문 검색
  * 근거 수준 높은 논문들로만 선별
  * PubMed 논문 검색 및 GPT 요약 시스템
  * 1. PubMed에서 최근 논문 검색
@@ -37,20 +33,10 @@ function fetchAndSummarizeAll() {
   }
 
   // 2) GPT 점수 산정 및 필터링 (점수 계산 후 'Included' 여부 표시)
-  //    반환값: 필터링된 논문 개수 (혹은 처리 결과)
   scoreAndFilterPapers(spreadsheet);
 
-  // 3) Notion에 원본 메타/초록 저장 (요약 제외)
-  //    (옵션: 점수 필터 통과한 것만 저장하려면 여기서 필터링 로직 추가 필요. 
-  //     일단 모든 검색 결과를 저장하고 싶다면 그대로 두거나, 
-  //     Filtered 된 것만 원한다면 4번 단계와 합칠 수도 있음.
-  //     사용자 요구사항: "뉴스레터에는 2점 이상의 검색 결과들을 포함" -> Notion 저장도 필터링 된 것만 하는 게 자연스러움)
-  
-  // 4) GPT 요약 생성 (Sheet의 Summary 컬럼 채움 - Included 인 것만)
+  // 3) GPT 요약 생성 (Sheet의 Summary 컬럼 채움 - Included 인 것만)
   summarizePubMedArticlesWithGPT(spreadsheet);
-
-  // 5) Notion에 Summary 업데이트 (Included 인 것만)
-  syncSheetToNotionPapersDB(spreadsheet, { includeSummary: true, filterHighScoresOnly: true });
 
   console.log("전체 워크플로우 완료");
 }
@@ -172,17 +158,20 @@ Abstract: "${abstract}"
 
 Categories:
 1. CANCER: cancer, carcinoma, tumor, malignancy, neoplasm, metastasis, oncology, lymphoma, leukemia, sarcoma, melanoma
-2. EOSINOPHIL: eosinophil*, hypereosinophil*, HES, EGPA, churg-strauss, eosinophilic esophagitis
-3. IMMUNE: immunodeficiency, primary immunodeficiency, IEI, CVID, SCID, agammaglobulinemia, hyper-IgM, selective IgA (exclude: immune checkpoint, CAR-T)
+2. URTICARIA_ANGIOEDEMA: urticaria, chronic urticaria, CSU, CIndU, angioedema, hereditary angioedema, HAE, bradykinin
+3. ANAPHYLAXIS_FOODALLERGY: anaphylaxis, anaphylactic, food allergy, food hypersensitivity, oral immunotherapy, OIT, FPIES
+4. MASTOCYTOSIS: mastocytosis, mast cell, systemic mastocytosis, cutaneous mastocytosis, MCAS, mast cell activation
 
 Return JSON:
 {
   "hasCancerInTitle": bool,
   "hasCancerInAbstract": bool,
-  "hasEosInTitle": bool,
-  "hasEosInAbstract": bool,
-  "hasImmuneInTitle": bool,
-  "hasImmuneInAbstract": bool
+  "hasUrticariaInTitle": bool,
+  "hasUrticariaInAbstract": bool,
+  "hasAnaphylaxisInTitle": bool,
+  "hasAnaphylaxisInAbstract": bool,
+  "hasMastocytosisInTitle": bool,
+  "hasMastocytosisInAbstract": bool
 }`;
 
   const jsonStr = callGPT(prompt, true, CONFIG.OPENAI_API_KEY_SCORING); // 점수 산정용 키 사용
@@ -191,8 +180,9 @@ Return JSON:
       console.error("GPT returned null/empty response");
       return {
         hasCancerInTitle: false, hasCancerInAbstract: false,
-        hasEosInTitle: false, hasEosInAbstract: false,
-        hasImmuneInTitle: false, hasImmuneInAbstract: false
+        hasUrticariaInTitle: false, hasUrticariaInAbstract: false,
+        hasAnaphylaxisInTitle: false, hasAnaphylaxisInAbstract: false,
+        hasMastocytosisInTitle: false, hasMastocytosisInAbstract: false
       };
   }
 
@@ -209,64 +199,61 @@ Return JSON:
     console.error("JSON parse error", e, "Raw:", jsonStr);
     return {
       hasCancerInTitle: false, hasCancerInAbstract: false,
-      hasEosInTitle: false, hasEosInAbstract: false,
-      hasImmuneInTitle: false, hasImmuneInAbstract: false
+      hasUrticariaInTitle: false, hasUrticariaInAbstract: false,
+      hasAnaphylaxisInTitle: false, hasAnaphylaxisInAbstract: false,
+      hasMastocytosisInTitle: false, hasMastocytosisInAbstract: false
     };
   }
 }
 
 function calculateScore(flags, journalName) {
   let cancerScore = 0;
-  let eosScore = 0;
-  let immuneScore = 0;
-  
-  // Cancer Scoring
-  // "cancer 와 관련된 키워드가 제목, 결론에 포함된 경우 각각 1점씩 감점을 하고, 제목, 결론에 모두 포함된 경우에는 3점을 감점한다."
+  let urticariaScore = 0;
+  let anaphylaxisScore = 0;
+  let mastocytosisScore = 0;
+
+  // Cancer Scoring (감점)
   if (flags.hasCancerInTitle && flags.hasCancerInAbstract) {
     cancerScore = -3;
   } else {
     if (flags.hasCancerInTitle) cancerScore -= 1;
     if (flags.hasCancerInAbstract) cancerScore -= 1;
   }
-  
-  // Eosinophil Scoring
-  // "제목, 결론에 포함된 경우 각각 2점씩 점수를 매기고, 제목, 결론에 모두 포함된 경우 전체 5점을 매긴다."
-  if (flags.hasEosInTitle && flags.hasEosInAbstract) {
-    eosScore = 5;
+
+  // Urticaria/Angioedema Scoring
+  if (flags.hasUrticariaInTitle && flags.hasUrticariaInAbstract) {
+    urticariaScore = 5;
   } else {
-    if (flags.hasEosInTitle) eosScore += 2;
-    if (flags.hasEosInAbstract) eosScore += 2;
+    if (flags.hasUrticariaInTitle) urticariaScore += 2;
+    if (flags.hasUrticariaInAbstract) urticariaScore += 2;
   }
 
-  // Immune Scoring
-  // "면역 질환... 제목, 결론에 포함된 경우 각각 2점씩 점수를 매기고, 제목, 결론에 모두 포함된 경우 전체 5점을 매긴다."
-  if (flags.hasImmuneInTitle && flags.hasImmuneInAbstract) {
-    immuneScore = 5;
+  // Anaphylaxis/Food Allergy Scoring
+  if (flags.hasAnaphylaxisInTitle && flags.hasAnaphylaxisInAbstract) {
+    anaphylaxisScore = 5;
   } else {
-    if (flags.hasImmuneInTitle) immuneScore += 2;
-    if (flags.hasImmuneInAbstract) immuneScore += 2;
+    if (flags.hasAnaphylaxisInTitle) anaphylaxisScore += 2;
+    if (flags.hasAnaphylaxisInAbstract) anaphylaxisScore += 2;
   }
-  
-  // Journal Bonus
-  // "저널이름에 'allergy' 가 들어가 있는 경우에는 전체 점수에서 1점 가산점"
-  //let journalBonus = 0;
-  //if (journalName && journalName.toLowerCase().includes("allergy")) {
-  //  journalBonus = 1;
-  //}
-  
-  // Final Calculation
-  // "호산구와 면역질환은 따로 점수를 매기고 둘중 점수가 높은 것을 선택하여 cancer 관련된 점수와 합산하여 최종 점수를 결정한다."
-  const baseScore = Math.max(eosScore, immuneScore);
-  const finalScore = baseScore + cancerScore ;
-  
-  // Threshold
-  // "전체 점수가 CONFIG.MIN_RELEVANCE_SCORE(3) 이상인 경우 ... 포함"
+
+  // Mastocytosis Scoring
+  if (flags.hasMastocytosisInTitle && flags.hasMastocytosisInAbstract) {
+    mastocytosisScore = 5;
+  } else {
+    if (flags.hasMastocytosisInTitle) mastocytosisScore += 2;
+    if (flags.hasMastocytosisInAbstract) mastocytosisScore += 2;
+  }
+
+  // Final Calculation: 각 주제별 점수 중 최고점 + cancer 감점
+  const baseScore = Math.max(urticariaScore, anaphylaxisScore, mastocytosisScore);
+  const finalScore = baseScore + cancerScore;
+
   const isIncluded = finalScore >= CONFIG.MIN_RELEVANCE_SCORE;
-  
+
   return {
     finalScore,
     isIncluded,
-    reason: `Base(${baseScore}) + Cancer(${cancerScore})  = ${finalScore}`
+    reason: `Base(${baseScore}) + Cancer(${cancerScore}) = ${finalScore}`
   };
 }
 
@@ -552,28 +539,37 @@ function fetchPubMedWeeklyAndSave() {
     .join(" OR ");
   const journalFilter = journalQuery ? `(${journalQuery})` : null;
 
-  /* ---------- MUST HAVE : 특이 질환 키워드 ---------- */
+  /* ---------- MUST HAVE : 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 키워드 ---------- */
   const mustHaveBlock = `
   (
-    eosinophil*[Title/Abstract]
-    OR eosinophilia*[Title/Abstract]
-    OR hypereosinophil*[Title/Abstract]
-    OR "hypereosinophilic syndrome"[Title/Abstract]
-    OR HES[Title/Abstract]
-    OR EGPA[Title/Abstract]
-    OR "churg-strauss"[Title/Abstract]
-    OR "eosinophilic esophagitis"[Title/Abstract]
+    urticaria*[Title/Abstract]
+    OR "chronic spontaneous urticaria"[Title/Abstract]
+    OR "chronic urticaria"[Title/Abstract]
+    OR CSU[Title/Abstract]
+    OR CIndU[Title/Abstract]
+    OR "inducible urticaria"[Title/Abstract]
 
-    OR immunodeficien*[Title/Abstract]
-    OR "primary immunodeficien*"[Title/Abstract]
-    OR "inborn errors of immunity"[Title/Abstract]
-    OR IEI[Title/Abstract]
-    OR CVID[Title/Abstract]
-    OR SCID[Title/Abstract]
-    OR agammaglobulin*[Title/Abstract]
-    OR "hyper-IgM"[Title/Abstract]
-    OR "selective IgA"[Title/Abstract]
-    OR hypogammaglobulinemia*[Title/Abstract]
+    OR angioedema*[Title/Abstract]
+    OR "hereditary angioedema"[Title/Abstract]
+    OR HAE[Title/Abstract]
+    OR "bradykinin-mediated angioedema"[Title/Abstract]
+
+    OR anaphyla*[Title/Abstract]
+    OR "anaphylactic shock"[Title/Abstract]
+
+    OR mastocytosis[Title/Abstract]
+    OR "mast cell"[Title/Abstract]
+    OR "systemic mastocytosis"[Title/Abstract]
+    OR "cutaneous mastocytosis"[Title/Abstract]
+    OR MCAS[Title/Abstract]
+    OR "mast cell activation"[Title/Abstract]
+
+    OR "food allergy"[Title/Abstract]
+    OR "food hypersensitivity"[Title/Abstract]
+    OR "oral immunotherapy"[Title/Abstract]
+    OR OIT[Title/Abstract]
+    OR FPIES[Title/Abstract]
+    OR "food-induced"[Title/Abstract]
 
   )
   `;

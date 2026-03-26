@@ -44,7 +44,7 @@ const BUSINESS_CONFIG = {
   // 이메일 설정
   EMAIL_BATCH_SIZE: 15,             // 한 이메일에 포함할 논문 수
   EMAIL_MAX_LENGTH: 100000,         // 이메일 최대 길이 제한
-  EMAIL_SUBJECT_PREFIX: '[EosImmuneWG Journal Letter]',
+  EMAIL_SUBJECT_PREFIX: '[CU-Ana Newsletter]',
 
   // API 설정
   GPT_MODEL: 'gpt-5-mini',          // GPT 모델명 (gpt-5-mini, gpt-4o-mini, gpt-4-turbo 등)
@@ -62,47 +62,68 @@ const BUSINESS_CONFIG = {
 
 // ===== 저널 목록 =====
 const JOURNALS = [
+  // === Allergy & Clinical Immunology ===
   "The Journal of allergy and clinical immunology",
   "J Allergy Clin Immunol",
   "Allergy",
-  "Annals of allergy, asthma & immunology",
-  "Ann Allergy Asthma Immunol",
-  "Clinical and experimental allergy",
-  "Clin Exp Allergy",
-  "Clinical and Translational Immunology",
-  "Immunological Reviews",
   "The journal of allergy and clinical immunology. In practice",
   "J Allergy Clin Immunol Pract",
+  "Clinical and experimental allergy",
+  "Clin Exp Allergy",
+  "Annals of allergy, asthma & immunology",
+  "Ann Allergy Asthma Immunol",
   "Allergology international",
   "Allergol Int",
   "The World Allergy Organization journal",
   "World Allergy Organ J",
-  "International Journal of Immunopathology and Pharmacology",
-  "NEJM evidence",
-  "NEJM Evid",
-  "The New England journal of medicine",
-  "N Engl J Med",
-  "The Lancet. Respiratory medicine",
-  "Lancet Respir Med",
-  "American journal of respiratory and critical care medicine",
-  "Am J Respir Crit Care Med",
   "Journal of Investigational Allergology and Clinical Immunology",
   "J Investig Allergol Clin Immunol",
-  "Allergy and asthma proceedings",
-  "Allergy Asthma Proc",
-  "Frontiers in Immunology",
-  "Allergy, asthma, and clinical immunology",
-  "Allergy Asthma Clin Immunol",
   "Allergy, Asthma and Immunology Research",
   "Allergy Asthma Immunol Res",
+  "Allergy, asthma, and clinical immunology",
+  "Allergy Asthma Clin Immunol",
+  "Allergy and asthma proceedings",
+  "Allergy Asthma Proc",
   "Allergy, Asthma and Respiratory Disease",
-  "International Journal of Rheumatic Diseases",
-  "European respriatory journal",
-  "ERJ open research",
-  "European Respiratory review",
-  "Breathe",
   "Asia pacific Allergy",
-  "Thorax"
+  "Clinical and Translational Immunology",
+  "Immunological Reviews",
+  "Frontiers in Immunology",
+  "Clinical and Translational Allergy",
+  "Clin Transl Allergy",
+  "Pediatric allergy and immunology",
+  "Pediatr Allergy Immunol",
+  "Current opinion in allergy and clinical immunology",
+  "Curr Opin Allergy Clin Immunol",
+  "International archives of allergy and immunology",
+  "Int Arch Allergy Immunol",
+
+  // === Dermatology ===
+  "Journal of the American Academy of Dermatology",
+  "J Am Acad Dermatol",
+  "JAMA dermatology",
+  "JAMA Dermatol",
+  "The British journal of dermatology",
+  "Br J Dermatol",
+  "The Journal of investigative dermatology",
+  "J Invest Dermatol",
+  "Journal of the European Academy of Dermatology and Venereology",
+  "J Eur Acad Dermatol Venereol",
+  "Contact dermatitis",
+  "Acta dermato-venereologica",
+  "Acta Derm Venereol",
+  "Journal of dermatological science",
+  "J Dermatol Sci",
+  "Dermatology",
+
+  // === General Medical ===
+  "The New England journal of medicine",
+  "N Engl J Med",
+  "NEJM evidence",
+  "NEJM Evid",
+  "The Lancet",
+  "JAMA",
+  "BMJ"
 ];
 
 // ===== 출판 유형 =====

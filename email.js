@@ -94,7 +94,7 @@ function sendSummariesToEmail(spreadsheet) {
     Logger.log(searchPeriod);
 
     // ✅ 이메일 제목: 필터링된 논문 수 사용
-    const subject = `[호산구면역질환연구팀] ${searchPeriod} 호산구면역질환 관련 논문 - 총 ${filteredData.length}개 논문`;
+    const subject = `[CU-Ana Newsletter] ${searchPeriod} 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 관련 논문 - 총 ${filteredData.length}개 논문`;
 
     // 이메일 본문 시작
     let emailBody = `<div style="font-family: Arial, sans-serif;">`;
@@ -104,7 +104,7 @@ function sendSummariesToEmail(spreadsheet) {
       font-weight: 700;
       margin-bottom: 16px;
     ">
-      최근 ${CONFIG.DAYS_RANGE}일 간 (${searchPeriod}) 호산구면역질환연구 논문 요약 </h4>`;
+      최근 ${CONFIG.DAYS_RANGE}일 간 (${searchPeriod}) 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 논문 요약 </h4>`;
     emailBody += `
     <p style="
       font-size: 16px;
@@ -180,7 +180,7 @@ function sendSummariesToEmail(spreadsheet) {
     
     // 이메일 본문 마무리
     emailBody += `<hr style="margin: 20px 0;">`;
-    emailBody += '<p stype="font-size: 16px;"> <br> 최근 7일(전자출판기준) 발표된 호산구/면역질환 관련 논문들 중 선별한 논문들에 대한 요약입니다. </p>';
+    emailBody += '<p stype="font-size: 16px;"> <br> 최근 7일(전자출판기준) 발표된 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 관련 논문들 중 선별한 논문들에 대한 요약입니다. </p>';
     emailBody += `<p style="color: #777; font-size: 12px;">이 이메일은 GPT에 의해 자동으로 생성되었습니다.</p>`;
     emailBody += `</div>`;
     
